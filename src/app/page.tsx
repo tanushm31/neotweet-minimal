@@ -1,103 +1,144 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { SessionProvider, useSession, signIn, signOut } from "next-auth/react";
+import { Tweet, fetchTweets, postTweet } from "@/utils/tweetUtils";
 import Image from "next/image";
+import { toast } from "sonner";
 
-export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+// This wrapper puts useSession INSIDE SessionProvider context
+function TweetApp() {
+	const { data: session } = useSession();
+	const [tweets, setTweets] = useState<Tweet[]>([]);
+	const [content, setContent] = useState("");
+	const [image, setImage] = useState<string | null>(null);
+	const [posting, setPosting] = useState(false);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+	useEffect(() => {
+		fetchTweets().then(setTweets);
+	}, []);
+
+	const handleTweet = async () => {
+		if (!content.trim() || posting) {
+			toast.error("Nothing to tweet—type something!");
+			return;
+		}
+		setPosting(true);
+		try {
+			const newTweet = await postTweet({ content, image });
+			setTweets([newTweet, ...tweets]);
+			setContent("");
+			setImage(null);
+			toast.success("Tweet posted!");
+			// reset file input if you’re using a ref
+		} catch (e) {
+			toast.error("Tweet failed: " + (e as Error).message);
+		} finally {
+			setPosting(false);
+		}
+	};
+
+	return (
+		<div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-950 text-gray-100 flex flex-col items-center">
+			<header className="py-6 text-3xl font-bold tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-600">
+				Neotweet
+			</header>
+			<div className="w-full max-w-xl p-6 bg-white/10 rounded-2xl shadow-2xl backdrop-blur-md">
+				{session ? (
+					<div className="flex flex-col gap-4">
+						<div className="flex items-center gap-3 mb-4">
+							<span className="text-lg text-cyan-200">
+								Welcome, {session.user?.name || "User"}!
+							</span>
+							<span className="font-semibold text-cyan-200">
+								{session.user?.email || "Anonymous"}
+							</span>
+							<button
+								onClick={() => signOut()}
+								className="ml-auto px-3 py-1 bg-red-600 rounded-full text-white font-semibold shadow hover:bg-red-700 transition"
+							>
+								Sign Out
+							</button>
+						</div>
+						<textarea
+							className="w-full rounded-xl p-3 bg-white/20 text-black outline-none border-none focus:ring-2 focus:ring-cyan-400"
+							placeholder="What's on your mind?"
+							value={content}
+							onChange={(e) => setContent(e.target.value)}
+							rows={2}
+						/>
+						<input
+							type="file"
+							accept="image/*"
+							onChange={(e) => {
+								const file = e.target.files?.[0];
+								if (file) {
+									const reader = new FileReader();
+									reader.onload = (ev) => setImage(ev.target?.result as string);
+									reader.readAsDataURL(file);
+								}
+							}}
+						/>
+						<button
+							onClick={handleTweet}
+							className="px-4 py-2 bg-cyan-600 rounded-xl text-white font-semibold shadow hover:bg-cyan-700 transition"
+						>
+							Tweet
+						</button>
+					</div>
+				) : (
+					<div className="flex flex-col items-center gap-4">
+						<p className="text-lg">Please sign in to post a tweet</p>
+						<button
+							onClick={() => signIn("google")}
+							className="px-4 py-2 bg-blue-600 rounded-xl text-white font-semibold shadow hover:bg-blue-700 transition"
+						>
+							Sign in with Google
+						</button>
+					</div>
+				)}
+			</div>
+			<div className="mt-10 w-full max-w-xl space-y-6">
+				{tweets.map((tweet) => (
+					<div key={tweet.id} className="p-6 bg-white/10 rounded-2xl shadow-xl">
+						<div className="flex items-center gap-3 mb-2">
+							<span className="font-semibold text-cyan-200">
+								{tweet.userEmail}
+							</span>
+							<span className="text-xs text-gray-500 ml-auto">
+								{new Date(tweet.createdAt).toLocaleString()}
+							</span>
+						</div>
+						<div className="whitespace-pre-line mb-2 text-lg">
+							{tweet.content}
+						</div>
+						{tweet.image && (
+							<div
+								className="relative rounded-xl max-h-80 w-full object-cover mt-2 overflow-hidden"
+								style={{ height: "320px" }}
+							>
+								<Image
+									src={tweet.image}
+									alt="tweet image"
+									fill
+									className="object-cover rounded-xl"
+									sizes="(max-width: 640px) 100vw, 600px"
+									priority={false}
+								/>
+							</div>
+						)}
+					</div>
+				))}
+			</div>
+		</div>
+	);
+}
+
+// Only call useSession inside a child of <SessionProvider />
+export default function Page() {
+	return (
+		<SessionProvider>
+			<TweetApp />
+		</SessionProvider>
+	);
 }
